@@ -106,6 +106,7 @@ function App() {
     if (!user) return
 
     refreshAllData()
+
     // The effect intentionally reruns only when auth or the active page changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activePage])
@@ -120,231 +121,240 @@ function App() {
     ])
   }
 
- async function loadMatches() {
-  if (!user) return
+  async function loadMatches() {
+    if (!user) return
 
-  setDataLoading(true)
+    setDataLoading(true)
 
-  try {
-    // --------------------------------------------------
-    // 1. Get MY lost items
-    // --------------------------------------------------
-    const { data: myLostItems, error: lostError } =
-      await supabase
-        .from('lost_items')
-        .select('*')
-        .eq('user_id', user.id)
+    try {
+      // --------------------------------------------------
+      // 1. Get MY lost items
+      // --------------------------------------------------
 
-    if (lostError) {
-      console.error('My lost items error:', lostError)
-    }
-
-    // --------------------------------------------------
-    // 2. Get MY found items
-    // --------------------------------------------------
-    const { data: myFoundItems, error: foundError } =
-      await supabase
-        .from('found_items')
-        .select('*')
-        .eq('user_id', user.id)
-
-    if (foundError) {
-      console.error('My found items error:', foundError)
-    }
-
-    const lostIds = (myLostItems || []).map(item => item.id)
-    const foundIds = (myFoundItems || []).map(item => item.id)
-
-    // No items = no matches
-    if (!lostIds.length && !foundIds.length) {
-      setMatches([])
-      setMatchCount(0)
-      return
-    }
-
-    // --------------------------------------------------
-    // 3. Get matches belonging to MY lost items
-    //    or MY found items
-    // --------------------------------------------------
-    const requests = []
-
-    if (lostIds.length) {
-      requests.push(
-        supabase
-          .from('match_results')
+      const { data: myLostItems, error: lostError } =
+        await supabase
+          .from('lost_items')
           .select('*')
-          .in('lost_item_id', lostIds)
-      )
-    }
+          .eq('user_id', user.id)
 
-    if (foundIds.length) {
-      requests.push(
-        supabase
-          .from('match_results')
+      if (lostError) {
+        console.error('My lost items error:', lostError)
+      }
+
+      // --------------------------------------------------
+      // 2. Get MY found items
+      // --------------------------------------------------
+
+      const { data: myFoundItems, error: foundError } =
+        await supabase
+          .from('found_items')
           .select('*')
-          .in('found_item_id', foundIds)
-      )
-    }
+          .eq('user_id', user.id)
 
-    const results = await Promise.all(requests)
-
-    const matchError =
-      results.find(result => result.error)?.error || null
-
-    if (matchError) {
-      console.error('Match results error:', matchError)
-
-      setMatches([])
-      setMatchCount(0)
-
-      return
-    }
-
-    // --------------------------------------------------
-    // 4. Remove duplicate rows
-    // --------------------------------------------------
-    const uniqueMatches = Array.from(
-      new Map(
-        results
-          .flatMap(result => result.data || [])
-          .map(match => [match.id, match])
-      ).values()
-    )
-
-    if (!uniqueMatches.length) {
-      setMatches([])
-      setMatchCount(0)
-      return
-    }
-
-    // --------------------------------------------------
-    // 5. Get IDs of linked items
-    // --------------------------------------------------
-    const allLostIds = [
-      ...new Set(
-        uniqueMatches
-          .map(match => match.lost_item_id)
-          .filter(Boolean)
-      )
-    ]
-
-    const allFoundIds = [
-      ...new Set(
-        uniqueMatches
-          .map(match => match.found_item_id)
-          .filter(Boolean)
-      )
-    ]
-
-    // --------------------------------------------------
-    // 6. Load linked lost items
-    // --------------------------------------------------
-    let linkedLostItems = []
-
-    if (allLostIds.length) {
-      const { data, error } = await supabase
-        .from('lost_items')
-        .select('*')
-        .in('id', allLostIds)
-
-      if (error) {
-        console.error('Linked lost items error:', error)
-      } else {
-        linkedLostItems = data || []
+      if (foundError) {
+        console.error('My found items error:', foundError)
       }
-    }
 
-    // --------------------------------------------------
-    // 7. Load linked found items
-    // --------------------------------------------------
-    let linkedFoundItems = []
+      const lostIds = (myLostItems || []).map(item => item.id)
+      const foundIds = (myFoundItems || []).map(item => item.id)
 
-    if (allFoundIds.length) {
-      const { data, error } = await supabase
-        .from('found_items')
-        .select('*')
-        .in('id', allFoundIds)
+      // No items = no matches
 
-      if (error) {
-        console.error('Linked found items error:', error)
-      } else {
-        linkedFoundItems = data || []
+      if (!lostIds.length && !foundIds.length) {
+        setMatches([])
+        setMatchCount(0)
+        return
       }
-    }
 
-    // --------------------------------------------------
-    // 8. Build frontend match objects
-    // --------------------------------------------------
-    const formattedMatches = uniqueMatches
-      .map(match => {
-        const lostItem =
-          linkedLostItems.find(
-            item => item.id === match.lost_item_id
-          ) ||
-          myLostItems?.find(
-            item => item.id === match.lost_item_id
-          ) ||
-          null
+      // --------------------------------------------------
+      // 3. Get matches belonging to MY lost items
+      //    or MY found items
+      // --------------------------------------------------
 
-        const foundItem =
-          linkedFoundItems.find(
-            item => item.id === match.found_item_id
-          ) ||
-          myFoundItems?.find(
-            item => item.id === match.found_item_id
-          ) ||
-          null
+      const requests = []
 
-        return {
-          ...match,
-          lostItem,
-          foundItem,
+      if (lostIds.length) {
+        requests.push(
+          supabase
+            .from('match_results')
+            .select('*')
+            .in('lost_item_id', lostIds)
+        )
+      }
 
-          isMyLostItem: lostIds.includes(
-            match.lost_item_id
-          ),
+      if (foundIds.length) {
+        requests.push(
+          supabase
+            .from('match_results')
+            .select('*')
+            .in('found_item_id', foundIds)
+        )
+      }
 
-          isMyFoundItem: foundIds.includes(
-            match.found_item_id
-          ),
+      const results = await Promise.all(requests)
+
+      const matchError =
+        results.find(result => result.error)?.error || null
+
+      if (matchError) {
+        console.error('Match results error:', matchError)
+
+        setMatches([])
+        setMatchCount(0)
+
+        return
+      }
+
+      // --------------------------------------------------
+      // 4. Remove duplicate rows
+      // --------------------------------------------------
+
+      const uniqueMatches = Array.from(
+        new Map(
+          results
+            .flatMap(result => result.data || [])
+            .map(match => [match.id, match])
+        ).values()
+      )
+
+      if (!uniqueMatches.length) {
+        setMatches([])
+        setMatchCount(0)
+        return
+      }
+
+      // --------------------------------------------------
+      // 5. Get IDs of linked items
+      // --------------------------------------------------
+
+      const allLostIds = [
+        ...new Set(
+          uniqueMatches
+            .map(match => match.lost_item_id)
+            .filter(Boolean)
+        ),
+      ]
+
+      const allFoundIds = [
+        ...new Set(
+          uniqueMatches
+            .map(match => match.found_item_id)
+            .filter(Boolean)
+        ),
+      ]
+
+      // --------------------------------------------------
+      // 6. Load linked lost items
+      // --------------------------------------------------
+
+      let linkedLostItems = []
+
+      if (allLostIds.length) {
+        const { data, error } = await supabase
+          .from('lost_items')
+          .select('*')
+          .in('id', allLostIds)
+
+        if (error) {
+          console.error('Linked lost items error:', error)
+        } else {
+          linkedLostItems = data || []
         }
-      })
-      .sort((a, b) => {
-        const dateA = a.created_at
-          ? new Date(a.created_at).getTime()
-          : 0
+      }
 
-        const dateB = b.created_at
-          ? new Date(b.created_at).getTime()
-          : 0
+      // --------------------------------------------------
+      // 7. Load linked found items
+      // --------------------------------------------------
 
-        return dateB - dateA
-      })
+      let linkedFoundItems = []
 
-    // --------------------------------------------------
-    // 9. Update UI
-    // --------------------------------------------------
-    setMatches(formattedMatches)
-    setMatchCount(formattedMatches.length)
+      if (allFoundIds.length) {
+        const { data, error } = await supabase
+          .from('found_items')
+          .select('*')
+          .in('id', allFoundIds)
 
-    console.log(
-      'Nexora matches loaded:',
-      formattedMatches
-    )
+        if (error) {
+          console.error('Linked found items error:', error)
+        } else {
+          linkedFoundItems = data || []
+        }
+      }
 
-  } catch (error) {
-    console.error(
-      'Loading matches failed:',
-      error
-    )
+      // --------------------------------------------------
+      // 8. Build frontend match objects
+      // --------------------------------------------------
 
-    setMatches([])
-    setMatchCount(0)
+      const formattedMatches = uniqueMatches
+        .map(match => {
+          const lostItem =
+            linkedLostItems.find(
+              item => item.id === match.lost_item_id
+            ) ||
+            myLostItems?.find(
+              item => item.id === match.lost_item_id
+            ) ||
+            null
 
-  } finally {
-    setDataLoading(false)
+          const foundItem =
+            linkedFoundItems.find(
+              item => item.id === match.found_item_id
+            ) ||
+            myFoundItems?.find(
+              item => item.id === match.found_item_id
+            ) ||
+            null
+
+          return {
+            ...match,
+            lostItem,
+            foundItem,
+
+            isMyLostItem: lostIds.includes(
+              match.lost_item_id
+            ),
+
+            isMyFoundItem: foundIds.includes(
+              match.found_item_id
+            ),
+          }
+        })
+        .sort((a, b) => {
+          const dateA = a.created_at
+            ? new Date(a.created_at).getTime()
+            : 0
+
+          const dateB = b.created_at
+            ? new Date(b.created_at).getTime()
+            : 0
+
+          return dateB - dateA
+        })
+
+      // --------------------------------------------------
+      // 9. Update UI
+      // --------------------------------------------------
+
+      setMatches(formattedMatches)
+      setMatchCount(formattedMatches.length)
+
+      console.log(
+        'Nexora matches loaded:',
+        formattedMatches
+      )
+    } catch (error) {
+      console.error(
+        'Loading matches failed:',
+        error
+      )
+
+      setMatches([])
+      setMatchCount(0)
+    } finally {
+      setDataLoading(false)
+    }
   }
-}
+
   /* =========================================
      LOAD ACTIVITY
   ========================================= */
@@ -390,7 +400,10 @@ function App() {
           .select('*')
 
       if (matchError) {
-        console.error('Activity match error:', matchError)
+        console.error(
+          'Activity match error:',
+          matchError
+        )
       }
 
       const myMatches = (matchRows || [])
@@ -474,7 +487,6 @@ function App() {
           )
           .slice(0, 10)
       )
-
     } catch (error) {
       console.error(
         'Loading activity failed:',
@@ -513,16 +525,21 @@ function App() {
       ])
 
       if (lostError) {
-        console.error('Lost count error:', lostError)
+        console.error(
+          'Lost count error:',
+          lostError
+        )
       }
 
       if (foundError) {
-        console.error('Found count error:', foundError)
+        console.error(
+          'Found count error:',
+          foundError
+        )
       }
 
       setLostItemCount(lostCount || 0)
       setFoundItemCount(foundCount || 0)
-
     } catch (error) {
       console.error(
         'Dashboard stats error:',
@@ -680,7 +697,8 @@ function App() {
     user?.user_metadata?.full_name ||
     user?.email?.split('@')[0] ||
     'User'
-    /* =========================================
+
+  /* =========================================
      LOST ITEM SUBMIT
   ========================================= */
 
@@ -730,10 +748,14 @@ function App() {
     let embedding
 
     try {
-      const imageUrl = URL.createObjectURL(lostImage)
+      const imageUrl =
+        URL.createObjectURL(lostImage)
 
       try {
-        embedding = await generateDinoV2Embedding(imageUrl)
+        embedding =
+          await generateDinoV2Embedding(
+            imageUrl
+          )
       } finally {
         URL.revokeObjectURL(imageUrl)
       }
@@ -755,7 +777,8 @@ function App() {
               lostBrand.trim() || null,
             color:
               lostColor.trim() || null,
-            location: lostLocation.trim(),
+            location:
+              lostLocation.trim(),
             lost_date:
               lostDate || null,
           })
@@ -918,12 +941,12 @@ function App() {
        * Give the database a moment to finish
        * committing match_results, then refresh.
        */
+
       await new Promise(resolve =>
         setTimeout(resolve, 500)
       )
 
       await refreshAllData()
-
     } catch (error) {
       console.error(
         'Lost item submission error:',
@@ -990,10 +1013,14 @@ function App() {
     let embedding
 
     try {
-      const imageUrl = URL.createObjectURL(foundImage)
+      const imageUrl =
+        URL.createObjectURL(foundImage)
 
       try {
-        embedding = await generateDinoV2Embedding(imageUrl)
+        embedding =
+          await generateDinoV2Embedding(
+            imageUrl
+          )
       } finally {
         URL.revokeObjectURL(imageUrl)
       }
@@ -1135,6 +1162,7 @@ function App() {
          * Edge Function returns "match"
          * not "matches".
          */
+
         const match =
           aiResult?.match || null
 
@@ -1187,7 +1215,6 @@ function App() {
       )
 
       await refreshAllData()
-
     } catch (error) {
       console.error(
         'Found item submission error:',
@@ -1435,6 +1462,7 @@ function App() {
       </div>
     )
   }
+
   /* =========================================
      MAIN APP
   ========================================= */
@@ -1596,7 +1624,7 @@ function App() {
             </span>
 
             <h1>
-              Good evening, {displayName} 👋
+              Welcome, {displayName} 👋
             </h1>
 
             <p>
@@ -2061,6 +2089,7 @@ function App() {
                   <small>
                     Items reunited
                   </small>
+
                 </div>
 
               </div>
@@ -2217,6 +2246,7 @@ function App() {
               <div className="form-grid">
 
                 <div className="form-field full">
+
                   <label htmlFor="lost-title">
                     Item Name *
                   </label>
@@ -2233,6 +2263,7 @@ function App() {
                     }
                     required
                   />
+
                 </div>
 
                 <div className="form-field">
@@ -2251,36 +2282,47 @@ function App() {
                     }
                     required
                   >
+
                     <option value="">
                       Select category
                     </option>
+
                     <option value="Electronics">
                       Electronics
                     </option>
+
                     <option value="Wallet">
                       Wallet
                     </option>
+
                     <option value="Keys">
                       Keys
                     </option>
+
                     <option value="Bag">
                       Bag
                     </option>
+
                     <option value="Clothing">
                       Clothing
                     </option>
+
                     <option value="Documents">
                       Documents
                     </option>
+
                     <option value="Jewelry">
                       Jewelry
                     </option>
+
                     <option value="Accessories">
                       Accessories
                     </option>
+
                     <option value="Other">
                       Other
                     </option>
+
                   </select>
 
                 </div>
@@ -2510,6 +2552,7 @@ function App() {
 
           </section>
         )}
+
         {/* =========================================
             REPORT FOUND ITEM
         ========================================= */}
