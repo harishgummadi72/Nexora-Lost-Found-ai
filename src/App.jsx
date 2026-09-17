@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import { generateDinoV2Embedding } from './lib/dinov2'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -723,10 +724,24 @@ function App() {
 
     setLoading(true)
     setSubmitMessage(
-      'Saving your lost item...'
+      'Loading Nexora AI...'
     )
 
+    let embedding
+
     try {
+      const imageUrl = URL.createObjectURL(lostImage)
+
+      try {
+        embedding = await generateDinoV2Embedding(imageUrl)
+      } finally {
+        URL.revokeObjectURL(imageUrl)
+      }
+
+      setSubmitMessage(
+        'Saving your lost item...'
+      )
+
       const { data: item, error: itemError } =
         await supabase
           .from('lost_items')
@@ -830,6 +845,7 @@ function App() {
             body: {
               item_image_id:
                 imageRecord.id,
+              embedding,
             },
           }
         )
@@ -968,10 +984,24 @@ function App() {
     setLoading(true)
 
     setFoundSubmitMessage(
-      'Saving your found item...'
+      'Loading Nexora AI...'
     )
 
+    let embedding
+
     try {
+      const imageUrl = URL.createObjectURL(foundImage)
+
+      try {
+        embedding = await generateDinoV2Embedding(imageUrl)
+      } finally {
+        URL.revokeObjectURL(imageUrl)
+      }
+
+      setFoundSubmitMessage(
+        'Saving your found item...'
+      )
+
       const { data: item, error: itemError } =
         await supabase
           .from('found_items')
@@ -1076,6 +1106,7 @@ function App() {
             body: {
               item_image_id:
                 imageRecord.id,
+              embedding,
             },
           }
         )
